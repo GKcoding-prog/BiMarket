@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Package, ShoppingBag, User, Heart, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { formatCurrency } from "@/lib/utils";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -76,7 +77,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-primary">{order.total.toFixed(2)} €</p>
+                        <p className="font-bold text-primary">{formatCurrency(order.total)}</p>
                         <p className="text-sm text-muted-foreground">{order.status}</p>
                       </div>
                     </div>

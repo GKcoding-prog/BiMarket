@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,35 +15,91 @@ import {
   Gift,
   Star,
   Truck,
-  Eye
+  Eye,
+  Loader2
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { apiClient } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 const ClientDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  
+  // Get tab from URL or default to "overview"
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview");
+  
+  // State for real data
+  const [orders, setOrders] = useState<any[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
 
-  // Mock data
+  // Update active tab when URL changes
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setOrdersLoading(true);
+      const { data, error } = await apiClient.getOrders();
+      if (data && !error) {
+        console.log('📦 Orders fetched:', data);
+        setOrders(data);
+      } else {
+        console.error('❌ Failed to fetch orders:', error);
+      }
+      setOrdersLoading(false);
+    };
+
+    const fetchWishlist = async () => {
+      setLoading(true);
+      const { data, error } = await apiClient.getWishlist();
+      if (data && !error) {
+        console.log('💜 Wishlist fetched:', data);
+        setWishlistItems(data.items || []);
+      } else {
+        console.error('❌ Failed to fetch wishlist:', error);
+      }
+      setLoading(false);
+    };
+
+    fetchOrders();
+    fetchWishlist();
+  }, []);
+
+  // Calculate real stats from orders
+  const totalOrders = orders.length;
+  const ordersInDelivery = orders.filter(o => o.status === 'en_cours').length;
+  const wishlistCount = wishlistItems.length; // Use actual wishlist items
+
   const stats = [
     { 
       icon: ShoppingBag, 
       label: "Commandes totales", 
-      value: "24",
+      value: totalOrders.toString(),
       color: "text-blue-500",
       bgColor: "bg-blue-500/10"
     },
     { 
       icon: Package, 
       label: "En livraison", 
-      value: "3",
+      value: ordersInDelivery.toString(),
       color: "text-amber-500",
       bgColor: "bg-amber-500/10"
     },
     { 
       icon: Heart, 
       label: "Liste de souhaits", 
-      value: "12",
+      value: wishlistCount.toString(),
       color: "text-rose-500",
       bgColor: "bg-rose-500/10"
     },
@@ -56,38 +112,53 @@ const ClientDashboard = () => {
     },
   ];
 
-  const recentOrders = [
-    { 
-      id: "CMD-5678", 
-      date: "22 Oct 2025", 
-      items: 3, 
-      total: 234.50, 
-      status: "livrée",
-      image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100"
-    },
-    { 
-      id: "CMD-5679", 
-      date: "20 Oct 2025", 
-      items: 1, 
-      total: 89.99, 
-      status: "en_cours",
-      image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100"
-    },
-    { 
-      id: "CMD-5680", 
-      date: "18 Oct 2025", 
-      items: 2, 
-      total: 156.00, 
-      status: "en_attente",
-      image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100"
-    },
-  ];
+  // Format real orders for display
+  const recentOrders = orders.slice(0, 5).map((order: any) => {
+    const firstItem = order.items?.[0];
+    return {
+      id: order.id,
+      date: new Date(order.created_at).toLocaleDateString('fr-FR', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      }),
+      items: order.items?.length || 0,
+      total: parseFloat(order.total_amount || 0),
+      status: order.status,
+      image: firstItem?.product?.image_url || firstItem?.product?.image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100"
+    };
+  });
 
-  const wishlist = [
-    { id: 1, name: "Sac à Dos Design", price: 89.99, image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=100", inStock: true },
-    { id: 2, name: "Lunettes de Soleil", price: 129.99, image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=100", inStock: true },
-    { id: 3, name: "Clavier Mécanique RGB", price: 169.99, image: "https://images.unsplash.com/photo-1595225476474-87563907a212?w=100", inStock: false },
-  ];
+  // Use real wishlist items
+  const wishlist = wishlistItems.map((item: any) => ({
+    id: item.id,
+    productId: item.product?.id,
+    name: item.product?.name,
+    price: parseFloat(item.product?.price || 0),
+    image: item.product?.image_url || item.product?.image || "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=100",
+    inStock: (item.product?.stock || 0) > 0
+  }));
+
+  const handleRemoveFromWishlist = async (productId: string) => {
+    const { error } = await apiClient.removeFromWishlist(productId);
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de retirer le produit",
+        variant: "destructive",
+      });
+    } else {
+      // Refresh wishlist
+      const { data } = await apiClient.getWishlist();
+      if (data) {
+        setWishlistItems(data.items || []);
+      }
+      toast({
+        title: "Produit retiré",
+        description: "Le produit a été retiré de vos favoris",
+      });
+    }
+  };
 
   const addresses = [
     { id: 1, label: "Domicile", address: "123 Rue de la Paix", city: "Paris 75001", isDefault: true },
@@ -146,7 +217,7 @@ const ClientDashboard = () => {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="orders" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
             <TabsTrigger value="orders">Commandes</TabsTrigger>
             <TabsTrigger value="wishlist">Favoris</TabsTrigger>
@@ -161,39 +232,56 @@ const ClientDashboard = () => {
                 <CardTitle>Mes Commandes</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="flex items-center gap-4 p-4 border rounded-lg hover:bg-secondary/50 transition-colors">
-                      <img 
-                        src={order.image} 
-                        alt="Order" 
-                        className="h-20 w-20 rounded-lg object-cover"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-semibold">{order.id}</p>
-                          {getStatusBadge(order.status)}
+                {ordersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : recentOrders.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Aucune commande pour le moment</p>
+                    <Button onClick={() => navigate('/products')} className="mt-4">
+                      <ShoppingBag className="h-4 w-4 mr-2" />
+                      Commencer mes achats
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentOrders.map((order) => (
+                      <div key={order.id} className="flex items-center gap-4 p-4 border rounded-lg hover:bg-secondary/50 transition-colors">
+                        <img 
+                          src={order.image} 
+                          alt="Order" 
+                          className="h-20 w-20 rounded-lg object-cover"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-semibold text-sm text-muted-foreground">
+                              Commande #{order.id.slice(0, 8)}
+                            </p>
+                            {getStatusBadge(order.status)}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-1">
+                            {order.date} • {order.items} article{order.items > 1 ? 's' : ''}
+                          </p>
+                          <p className="font-bold text-lg">{formatCurrency(order.total)}</p>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-1">
-                          {order.date} • {order.items} article{order.items > 1 ? 's' : ''}
-                        </p>
-                        <p className="font-bold text-lg">{order.total.toFixed(2)} €</p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4 mr-1" />
-                          Détails
-                        </Button>
-                        {order.status === 'en_cours' && (
+                        <div className="flex flex-col gap-2">
                           <Button variant="outline" size="sm">
-                            <Truck className="h-4 w-4 mr-1" />
-                            Suivre
+                            <Eye className="h-4 w-4 mr-1" />
+                            Détails
                           </Button>
-                        )}
+                          {order.status === 'en_cours' && (
+                            <Button variant="outline" size="sm">
+                              <Truck className="h-4 w-4 mr-1" />
+                              Suivre
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -208,28 +296,59 @@ const ClientDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {wishlist.map((item) => (
-                    <div key={item.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <img 
-                        src={item.image} 
-                        alt={item.name} 
-                        className="w-full h-32 object-cover rounded-lg mb-3"
-                      />
-                      <p className="font-semibold mb-2">{item.name}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="font-bold text-primary">{item.price.toFixed(2)} €</p>
-                        <Badge variant={item.inStock ? "default" : "secondary"}>
-                          {item.inStock ? "En stock" : "Rupture"}
-                        </Badge>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : wishlist.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Heart className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-semibold mb-2">Votre liste de souhaits est vide</h3>
+                    <p className="text-sm mb-6">
+                      Explorez nos produits et ajoutez vos favoris en cliquant sur l'icône ❤️
+                    </p>
+                    <Button onClick={() => navigate('/products')}>
+                      <ShoppingBag className="h-4 w-4 mr-2" />
+                      Découvrir les produits
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {wishlist.map((item) => (
+                      <div key={item.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow relative">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleRemoveFromWishlist(item.productId)}
+                        >
+                          <Heart className="h-4 w-4 fill-current" />
+                        </Button>
+                        <img 
+                          src={item.image} 
+                          alt={item.name} 
+                          className="w-full h-32 object-cover rounded-lg mb-3"
+                        />
+                        <p className="font-semibold mb-2">{item.name}</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="font-bold text-primary">{formatCurrency(item.price)}</p>
+                          <Badge variant={item.inStock ? "default" : "secondary"}>
+                            {item.inStock ? "En stock" : "Rupture"}
+                          </Badge>
+                        </div>
+                        <Button 
+                          className="w-full" 
+                          size="sm" 
+                          disabled={!item.inStock}
+                          onClick={() => navigate('/products')}
+                        >
+                          <ShoppingBag className="h-4 w-4 mr-1" />
+                          Voir le produit
+                        </Button>
                       </div>
-                      <Button className="w-full mt-3" size="sm" disabled={!item.inStock}>
-                        <ShoppingBag className="h-4 w-4 mr-1" />
-                        Ajouter au panier
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

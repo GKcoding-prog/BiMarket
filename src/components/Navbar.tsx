@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, User, LogOut, Menu, X, Search, Heart, Package } from "lucide-react";
@@ -12,12 +12,30 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { apiClient } from "@/lib/api";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const { user, signOut, userRole } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [wishlistCount, setWishlistCount] = useState(0);
+
+  // Fetch wishlist count when user is logged in
+  useEffect(() => {
+    const fetchWishlistCount = async () => {
+      if (user) {
+        const { data } = await apiClient.getWishlist();
+        if (data) {
+          setWishlistCount(data.count || 0);
+        }
+      } else {
+        setWishlistCount(0);
+      }
+    };
+    
+    fetchWishlistCount();
+  }, [user]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,11 +113,18 @@ const Navbar = () => {
 
             {/* Wishlist - Only for logged in users */}
             {user && (
-              <Button variant="ghost" size="icon" className="relative hidden sm:flex">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative hidden sm:flex"
+                onClick={() => navigate("/dashboard?tab=wishlist")}
+              >
                 <Heart className="h-5 w-5" />
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0">
-                  0
-                </Badge>
+                {wishlistCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0">
+                    {wishlistCount}
+                  </Badge>
+                )}
               </Button>
             )}
 

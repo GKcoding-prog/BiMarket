@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ProductCard from "@/components/ProductCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { apiClient } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 import { 
   Search, 
   SlidersHorizontal, 
@@ -20,118 +22,40 @@ const Products = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("featured");
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const products = [
-    { 
-      id: 1, 
-      name: "Casque Audio Premium", 
-      price: 199.99, 
-      originalPrice: 249.99,
-      image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500", 
-      category: "Audio",
-      rating: 4.8,
-      reviews: 234,
-      isNew: false,
-      isFeatured: true,
-      discount: 20
-    },
-    { 
-      id: 2, 
-      name: "Montre Connectée Pro", 
-      price: 299.99, 
-      image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500", 
-      category: "Tech",
-      rating: 4.9,
-      reviews: 456,
-      isNew: true,
-      isFeatured: true
-    },
-    { 
-      id: 3, 
-      name: "Sac à Dos Design", 
-      price: 89.99, 
-      originalPrice: 129.99,
-      image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500", 
-      category: "Mode",
-      rating: 4.6,
-      reviews: 189,
-      isNew: false,
-      isFeatured: false,
-      discount: 31
-    },
-    { 
-      id: 4, 
-      name: "Sneakers Édition Limitée", 
-      price: 149.99, 
-      image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500", 
-      category: "Chaussures",
-      rating: 4.7,
-      reviews: 567,
-      isNew: false,
-      isFeatured: true
-    },
-    { 
-      id: 5, 
-      name: "Appareil Photo Mirrorless", 
-      price: 1299.99, 
-      originalPrice: 1499.99,
-      image: "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=500", 
-      category: "Photo",
-      rating: 4.9,
-      reviews: 123,
-      isNew: true,
-      isFeatured: true,
-      discount: 13
-    },
-    { 
-      id: 6, 
-      name: "Enceinte Bluetooth", 
-      price: 79.99, 
-      image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500", 
-      category: "Audio",
-      rating: 4.5,
-      reviews: 345,
-      isNew: false,
-      isFeatured: false
-    },
-    { 
-      id: 7, 
-      name: "Lunettes de Soleil", 
-      price: 129.99, 
-      originalPrice: 159.99,
-      image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500", 
-      category: "Accessoires",
-      rating: 4.4,
-      reviews: 78,
-      isNew: false,
-      isFeatured: false,
-      discount: 19
-    },
-    { 
-      id: 8, 
-      name: "Clavier Mécanique RGB", 
-      price: 169.99, 
-      image: "https://images.unsplash.com/photo-1595225476474-87563907a212?w=500", 
-      category: "Gaming",
-      rating: 4.8,
-      reviews: 289,
-      isNew: true,
-      isFeatured: false
-    },
-  ];
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+  }, []);
 
-  const categories = [
-    { name: "Tous", count: products.length },
-    { name: "Audio", count: products.filter(p => p.category === "Audio").length },
-    { name: "Tech", count: products.filter(p => p.category === "Tech").length },
-    { name: "Mode", count: products.filter(p => p.category === "Mode").length },
-    { name: "Chaussures", count: products.filter(p => p.category === "Chaussures").length },
-    { name: "Photo", count: products.filter(p => p.category === "Photo").length },
-    { name: "Gaming", count: products.filter(p => p.category === "Gaming").length },
-    { name: "Accessoires", count: products.filter(p => p.category === "Accessoires").length },
-  ];
-  
-  const [selectedCategory, setSelectedCategory] = useState("Tous");
+  const fetchProducts = async () => {
+    setLoading(true);
+    const { data, error } = await apiClient.getProducts();
+    if (data && !error) {
+      // Map backend fields to frontend expected fields
+      const mappedProducts = data.map((product: any) => ({
+        ...product,
+        image: product.image_url || product.image, // Map image_url to image
+        // Keep category as is (can be object or string)
+      }));
+      setProducts(mappedProducts);
+    } else {
+      console.error('Error fetching products:', error);
+    }
+    setLoading(false);
+  };
+
+  const fetchCategories = async () => {
+    const { data, error } = await apiClient.getCategories();
+    if (data && !error) {
+      setCategories(data);
+    }
+  };
+
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const sortOptions = [
     { value: "featured", label: "Mis en avant", icon: Star },
@@ -142,9 +66,24 @@ const Products = () => {
     { value: "popular", label: "Plus populaires", icon: TrendingUp },
   ];
 
+  // Get categories with product counts
+  const categoriesWithCounts = [
+    { id: null, name: "Tous", count: products.length },
+    ...categories.map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      count: products.filter((p: any) => {
+        const productCatId = typeof p.category === 'object' ? p.category?.id : p.category;
+        return productCatId === cat.id;
+      }).length
+    }))
+  ];
+
+  // Filter products
   let filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "Tous" || product.category === selectedCategory;
+    const productCatId = typeof product.category === 'object' ? product.category?.id : product.category;
+    const matchesCategory = selectedCategory === null || productCatId === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -177,7 +116,7 @@ const Products = () => {
             <div>
               <h1 className="text-4xl font-bold text-foreground mb-2">Notre Catalogue</h1>
               <p className="text-xl text-muted-foreground">
-                {filteredProducts.length} produits disponibles
+                {loading ? "Chargement..." : `${filteredProducts.length} produits disponibles`}
               </p>
             </div>
             
@@ -228,12 +167,12 @@ const Products = () => {
               <div className="mb-6">
                 <h4 className="font-medium text-foreground mb-3">Catégories</h4>
                 <div className="space-y-2">
-                  {categories.map((category) => (
+                  {categoriesWithCounts.map((category) => (
                     <button
-                      key={category.name}
-                      onClick={() => setSelectedCategory(category.name)}
+                      key={category.id || 'all'}
+                      onClick={() => setSelectedCategory(category.id)}
                       className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors ${
-                        selectedCategory === category.name
+                        selectedCategory === category.id
                           ? "bg-primary text-primary-foreground"
                           : "hover:bg-muted text-muted-foreground hover:text-foreground"
                       }`}
@@ -298,7 +237,11 @@ const Products = () => {
             </div>
 
             {/* Products Grid/List */}
-            {filteredProducts.length > 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : filteredProducts.length > 0 ? (
               <div className={
                 viewMode === "grid" 
                   ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" 
@@ -327,7 +270,7 @@ const Products = () => {
                     variant="outline"
                     onClick={() => {
                       setSearchQuery("");
-                      setSelectedCategory("Tous");
+                      setSelectedCategory(null);
                     }}
                   >
                     Réinitialiser les filtres

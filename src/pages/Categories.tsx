@@ -1,17 +1,68 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { apiClient } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 const Categories = () => {
   const navigate = useNavigate();
+  const [categories, setCategories] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const categories = [
-    { name: "Audio", count: 15, image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500", color: "from-purple-500 to-purple-700" },
-    { name: "Tech", count: 24, image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=500", color: "from-blue-500 to-blue-700" },
-    { name: "Mode", count: 32, image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=500", color: "from-pink-500 to-pink-700" },
-    { name: "Chaussures", count: 18, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500", color: "from-orange-500 to-orange-700" },
-    { name: "Photo", count: 12, image: "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=500", color: "from-green-500 to-green-700" },
-    { name: "Gaming", count: 21, image: "https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=500", color: "from-red-500 to-red-700" },
+  // Gradient colors for categories
+  const gradientColors = [
+    "from-purple-500 to-purple-700",
+    "from-blue-500 to-blue-700",
+    "from-pink-500 to-pink-700",
+    "from-orange-500 to-orange-700",
+    "from-green-500 to-green-700",
+    "from-red-500 to-red-700",
+    "from-indigo-500 to-indigo-700",
+    "from-yellow-500 to-yellow-700",
+    "from-teal-500 to-teal-700",
   ];
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      const [categoriesRes, productsRes] = await Promise.all([
+        apiClient.getCategories(),
+        apiClient.getProducts()
+      ]);
+
+      if (categoriesRes.data && !categoriesRes.error) {
+        const cats = categoriesRes.data;
+        const prods = productsRes.data || [];
+        
+        // Calculate product counts per category
+        const categoriesWithCounts = cats.map((cat: any, index: number) => {
+          // Count products that belong to this category
+          const count = prods.filter((p: any) => {
+            const productCatId = typeof p.category === 'object' 
+              ? p.category?.id 
+              : p.category;
+            return productCatId === cat.id;
+          }).length;
+          
+          return {
+            ...cat,
+            count,
+            color: gradientColors[index % gradientColors.length],
+            image: cat.image_url || cat.image || "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=500"
+          };
+        });
+        
+        console.log('📊 Categories with counts:', categoriesWithCounts);
+        
+        setCategories(categoriesWithCounts);
+        setProducts(prods);
+      }
+      setLoading(false);
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <div className="min-h-screen py-8">
@@ -21,8 +72,17 @@ const Categories = () => {
           <p className="text-xl text-muted-foreground">Explorez nos différentes catégories de produits</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map((category, index) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-20">
+            <p className="text-xl text-muted-foreground">Aucune catégorie disponible pour le moment</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {categories.map((category, index) => (
             <Card 
               key={category.name}
               className="group overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 animate-fade-in"
@@ -43,7 +103,8 @@ const Categories = () => {
               </div>
             </Card>
           ))}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

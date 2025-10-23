@@ -27,16 +27,32 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const DashboardRouter = () => {
-  const { userRole, loading } = useAuth();
+  const { userRole, loading, user } = useAuth();
+  
+  // Check localStorage directly
+  const storedEmail = localStorage.getItem('user_email');
+  const storedRole = storedEmail ? localStorage.getItem(`user_role_${storedEmail}`) : null;
+  
+  console.log('🔍 DashboardRouter Debug Info:');
+  console.log('  - userRole from context:', userRole);
+  console.log('  - userRole type:', typeof userRole);
+  console.log('  - user from context:', user);
+  console.log('  - storedEmail:', storedEmail);
+  console.log('  - storedRole:', storedRole);
+  console.log('  - loading:', loading);
+  console.log('  - Check: userRole === "vendeur":', userRole === 'vendeur');
+  console.log('  - Check: storedRole === "vendeur":', storedRole === 'vendeur');
   
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
   }
   
   if (userRole === 'vendeur') {
+    console.log('✅ Routing to SellerDashboard');
     return <SellerDashboard />;
   }
   
+  console.log('✅ Routing to ClientDashboard (default)');
   return <ClientDashboard />;
 };
 

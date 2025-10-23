@@ -17,7 +17,9 @@ const loginSchema = z.object({
 });
 
 const registerSchema = loginSchema.extend({
-  fullName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
+  lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  phone: z.string().optional(),
   role: z.enum(['client', 'vendeur']),
 });
 
@@ -27,9 +29,11 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
+    phone: "",
     role: "client" as 'client' | 'vendeur'
   });
 
@@ -82,7 +86,9 @@ const Login = () => {
       const { error } = await signUp(
         registerData.email,
         registerData.password,
-        registerData.fullName,
+        registerData.firstName,
+        registerData.lastName,
+        registerData.phone,
         registerData.role
       );
       
@@ -165,13 +171,24 @@ const Login = () => {
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nom complet</Label>
+                  <Label htmlFor="firstName">Prénom</Label>
                   <Input 
-                    id="name" 
+                    id="firstName" 
                     type="text" 
-                    placeholder="Jean Dupont"
-                    value={registerData.fullName}
-                    onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
+                    placeholder="Jean"
+                    value={registerData.firstName}
+                    onChange={(e) => setRegisterData({ ...registerData, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Nom</Label>
+                  <Input 
+                    id="lastName" 
+                    type="text" 
+                    placeholder="Dupont"
+                    value={registerData.lastName}
+                    onChange={(e) => setRegisterData({ ...registerData, lastName: e.target.value })}
                     required
                   />
                 </div>
@@ -184,6 +201,16 @@ const Login = () => {
                     value={registerData.email}
                     onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
                     required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Téléphone (optionnel)</Label>
+                  <Input 
+                    id="phone" 
+                    type="tel" 
+                    placeholder="+33 6 12 34 56 78"
+                    value={registerData.phone}
+                    onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">

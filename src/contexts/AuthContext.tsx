@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   userRole: string | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, role?: 'client' | 'vendeur') => Promise<{ error: any }>;
+  signUp: (email: string, password: string, firstName: string, lastName: string, phone?: string, role?: 'client' | 'vendeur') => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any; user?: User }>;
   signOut: () => Promise<void>;
 }
@@ -29,8 +29,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userProfile && !error) {
           setUser(userProfile);
           setUserRole(userProfile.role);
+          console.log('✅ User restored from profile:', userProfile);
         } else {
-          apiClient.clearToken();
+          // Profile endpoint failed, try to restore from localStorage
+          const storedEmail = localStorage.getItem('user_email');
+          if (storedEmail) {
+            const storedRole = localStorage.getItem(`user_role_${storedEmail}`) as 'client' | 'vendeur' | null;
+            
+            const fallbackUser: User = {
+              id: 'temp',
+              email: storedEmail,
+              full_name: storedEmail.split('@')[0],
+              role: storedRole || 'client',
+            };
+            
+            setUser(fallbackUser);
+            setUserRole(fallbackUser.role);
+            console.log('✅ User restored from localStorage:', fallbackUser);
+          } else {
+            apiClient.clearToken();
+          }
         }
       }
       
@@ -40,21 +58,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initAuth();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string, role: 'client' | 'vendeur' = 'client') => {
+  const signUp = async (email: string, password: string, firstName: string, lastName: string, phone: string = "", role: 'client' | 'vendeur' = 'client') => {
+    // Generate username from email (or could use first+last name)
+    const username = email.split('@')[0];
+    
     const registerData: RegisterData = {
       email,
       password,
-      full_name: fullName,
+      username,
+      first_name: firstName,
+      last_name: lastName,
+      phone,
       role
     };
 
-    console.log('🚀 Attempting registration with:', { email, fullName, role });
+    console.log('🚀 Attempting registration with:', { email, username, firstName, lastName, phone, role });
 
     const { data, error } = await apiClient.register(registerData);
 
     console.log('📝 Registration response:', { data, error });
 
     if (data && !error) {
+      // Store the user's role locally for login fallback
+      localStorage.setItem(`user_role_${email}`, role);
+      
       toast({
         title: "Compte créé avec succès ! 🎉",
         description: "Vous pouvez maintenant vous connecter.",
@@ -78,24 +105,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data && !error) {
       apiClient.setToken(data.access);
       localStorage.setItem('refresh_token', data.refresh);
+      localStorage.setItem('user_email', email); // Store email for session restoration
       
-      // Try to get user profile, but don't fail if endpoint doesn't exist
+      // Try to get user profile
       const { data: userProfile } = await apiClient.getProfile();
       
-      // Create a basic user object from the token if profile fetch fails
-      const user: User = userProfile || {
-        id: 'temp',
-        email: email,
-        full_name: email.split('@')[0],
-        role: 'client', // Default role, will be updated when backend provides correct endpoint
-      };
+      // Use profile data if available, otherwise create basic user object
+      let user: User;
+      
+      if (userProfile) {
+        user = userProfile;
+      } else {
+        // Check if we have stored role from registration
+        const storedRole = localStorage.getItem(`user_role_${email}`) as 'client' | 'vendeur' | null;
+        
+        user = {
+          id: 'temp',
+          email: email,
+          full_name: email.split('@')[0],
+          role: storedRole || 'client', // Use stored role or default to client
+        };
+      }
       
       setUser(user);
       setUserRole(user.role);
 
+      console.log('✅ User logged in:', { email: user.email, role: user.role });
+
       toast({
         title: "Connexion réussie ! ✨",
-        description: "Bienvenue !",
+        description: `Bienvenue ${user.role === 'vendeur' ? 'vendeur' : ''} !`,
       });
 
       // Handle pending cart item
@@ -130,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await apiClient.logout();
     setUser(null);
     setUserRole(null);
+    localStorage.removeItem('user_email'); // Clear stored email
     
     toast({
       title: "Déconnexion réussie",

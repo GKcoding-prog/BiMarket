@@ -4,23 +4,36 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import ProductCard from "@/components/ProductCard";
 import { Badge } from "@/components/ui/badge";
+import { apiClient } from "@/lib/api";
+import { useState, useEffect } from "react";
 
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
 
-  const featuredProducts = [
-    { id: 1, name: "Casque Audio Premium", price: 199.99, image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500", category: "Audio" },
-    { id: 2, name: "Montre Connectée Pro", price: 299.99, image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500", category: "Tech" },
-    { id: 3, name: "Sac à Dos Design", price: 89.99, image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500", category: "Mode" },
-    { id: 4, name: "Sneakers Édition Limitée", price: 149.99, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500", category: "Chaussures" },
-  ];
+  useEffect(() => {
+    fetchFeaturedProducts();
+  }, []);
+
+  const fetchFeaturedProducts = async () => {
+    const { data, error } = await apiClient.getProducts();
+    if (data && !error) {
+      // Map backend fields and get first 4 products as featured
+      const mappedProducts = data.map((product: any) => ({
+        ...product,
+        image: product.image_url || product.image, // Map image_url to image
+        category: product.category || 'Non catégorisé'
+      }));
+      setFeaturedProducts(mappedProducts.slice(0, 4));
+    }
+  };
 
   const features = [
     { 
       icon: Truck, 
       title: "Livraison Gratuite", 
-      description: "Sur toutes les commandes de plus de 50€",
+      description: "Sur toutes les commandes de plus de 50,000 FBu",
       color: "bg-blue-500/10 text-blue-600"
     },
     { 

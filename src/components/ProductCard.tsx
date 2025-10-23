@@ -5,15 +5,17 @@ import { ShoppingCart, Heart, Eye, Star } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiClient } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 
 interface ProductCardProps {
   id: number;
   name: string;
-  price: number;
-  originalPrice?: number;
+  price: number | string;
+  originalPrice?: number | string;
   image: string;
-  category: string;
+  category: string | { id: string; name: string } | any;  // Can be string or object
   rating?: number;
   reviews?: number;
   isNew?: boolean;
@@ -39,6 +41,34 @@ const ProductCard = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isAdding, setIsAdding] = useState(false);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  
+  // Convert price to number safely
+  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+  const numOriginalPrice = originalPrice ? (typeof originalPrice === 'string' ? parseFloat(originalPrice) : originalPrice) : undefined;
+  
+  // Get category name - handle both string and object
+  const categoryName = typeof category === 'string' 
+    ? category 
+    : (category?.name || 'Non catégorisé');
+  
+  // Check if product is in wishlist on mount
+  useEffect(() => {
+    const checkWishlistStatus = async () => {
+      if (user) {
+        const { data } = await apiClient.checkWishlist(id.toString());
+        if (data) {
+          setIsInWishlist(data.in_wishlist);
+        }
+      }
+    };
+    checkWishlistStatus();
+  }, [user, id]);
+  
+  const handleImageError = () => {
+    console.warn(`⚠️ Failed to load image for product "${name}":`, image);
+  };
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -55,14 +85,26 @@ const ProductCard = ({
 
     setIsAdding(true);
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+      console.log(`🛒 Adding product to cart:`, { id, name, quantity: 1 });
       
-      toast({
-        title: "Produit ajouté ! 🛒",
-        description: `${name} a été ajouté à votre panier`,
-      });
+      const { error } = await apiClient.addToCart(id.toString(), 1);
+      
+      if (error) {
+        console.error('❌ Failed to add to cart:', error);
+        toast({
+          title: "Erreur",
+          description: error || "Impossible d'ajouter le produit au panier",
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ Product added to cart successfully');
+        toast({
+          title: "Produit ajouté ! 🛒",
+          description: `${name} a été ajouté à votre panier`,
+        });
+      }
     } catch (error) {
+      console.error('❌ Exception while adding to cart:', error);
       toast({
         title: "Erreur",
         description: "Impossible d'ajouter le produit au panier",
@@ -73,7 +115,7 @@ const ProductCard = ({
     }
   };
 
-  const handleWishlist = () => {
+  const handleWishlist = async () => {
     if (!user) {
       toast({
         title: "Connexion requise",
@@ -84,10 +126,38 @@ const ProductCard = ({
       return;
     }
 
-    toast({
-      title: "Ajouté aux favoris ! ❤️",
-      description: `${name} a été ajouté à vos favoris`,
-    });
+    setWishlistLoading(true);
+    try {
+      const { data, error } = await apiClient.toggleWishlist(id.toString());
+      
+      if (error) {
+        console.error('❌ Wishlist toggle failed:', error);
+        toast({
+          title: "Erreur",
+          description: error || "Impossible de modifier vos favoris",
+          variant: "destructive",
+        });
+      } else {
+        const inWishlist = data?.in_wishlist;
+        setIsInWishlist(inWishlist);
+        
+        toast({
+          title: inWishlist ? "Ajouté aux favoris ! 💜" : "Retiré des favoris",
+          description: inWishlist 
+            ? `${name} a été ajouté à vos favoris`
+            : `${name} a été retiré de vos favoris`,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Exception in wishlist:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier vos favoris",
+        variant: "destructive",
+      });
+    } finally {
+      setWishlistLoading(false);
+    }
   };
 
   const handleQuickView = () => {
@@ -118,6 +188,7 @@ const ProductCard = ({
               src={image} 
               alt={name}
               className="object-cover w-full h-full rounded-lg group-hover:scale-105 transition-transform duration-300"
+              onError={handleImageError}
             />
             
             {/* Badges */}
@@ -146,14 +217,19 @@ const ProductCard = ({
                   variant="ghost" 
                   size="icon"
                   onClick={handleWishlist}
-                  className="text-muted-foreground hover:text-red-500"
+                  disabled={wishlistLoading}
+                  className={`transition-colors ${
+                    isInWishlist 
+                      ? 'text-red-500 hover:text-red-600' 
+                      : 'text-muted-foreground hover:text-red-500'
+                  }`}
                 >
-                  <Heart className="h-4 w-4" />
+                  <Heart className={`h-4 w-4 ${isInWishlist ? 'fill-current' : ''}`} />
                 </Button>
               </div>
               
               <Badge variant="outline" className="mb-2 text-xs">
-                {category}
+                {categoryName}
               </Badge>
 
               <div className="flex items-center space-x-2 mb-2">
@@ -169,11 +245,11 @@ const ProductCard = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <span className="text-xl font-bold text-primary">
-                  {price.toFixed(2)} €
+                  {formatCurrency(numPrice)}
                 </span>
-                {originalPrice && (
+                {numOriginalPrice && (
                   <span className="text-sm text-muted-foreground line-through">
-                    {originalPrice.toFixed(2)} €
+                    {formatCurrency(numOriginalPrice)}
                   </span>
                 )}
               </div>
@@ -211,6 +287,7 @@ const ProductCard = ({
           src={image} 
           alt={name}
           className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500"
+          onError={handleImageError}
         />
         
         {/* Action Buttons Overlay */}
@@ -227,9 +304,12 @@ const ProductCard = ({
             variant="secondary" 
             size="icon"
             onClick={handleWishlist}
-            className="bg-background/90 backdrop-blur-sm hover:bg-background"
+            disabled={wishlistLoading}
+            className={`bg-background/90 backdrop-blur-sm hover:bg-background transition-all ${
+              isInWishlist ? 'text-red-500' : ''
+            }`}
           >
-            <Heart className="h-4 w-4" />
+            <Heart className={`h-4 w-4 ${isInWishlist ? 'fill-current' : ''}`} />
           </Button>
         </div>
 
@@ -256,7 +336,7 @@ const ProductCard = ({
 
         {/* Category Badge */}
         <div className="absolute bottom-2 left-2 px-2 py-1 bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs font-medium rounded-md">
-          {category}
+          {categoryName}
         </div>
       </div>
       
@@ -274,10 +354,10 @@ const ProductCard = ({
 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <p className="text-xl font-bold text-primary">{price.toFixed(2)} €</p>
-            {originalPrice && (
+            <p className="text-xl font-bold text-primary">{formatCurrency(numPrice)}</p>
+            {numOriginalPrice && (
               <p className="text-sm text-muted-foreground line-through">
-                {originalPrice.toFixed(2)} €
+                {formatCurrency(numOriginalPrice)}
               </p>
             )}
           </div>

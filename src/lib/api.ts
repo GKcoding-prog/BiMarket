@@ -15,10 +15,10 @@ interface LoginCredentials {
 interface RegisterData {
   email: string;
   password: string;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  username?: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
   role?: 'client' | 'vendeur';
 }
 
@@ -128,56 +128,31 @@ class ApiClient {
   }
 
   async register(userData: RegisterData): Promise<ApiResponse<User>> {
-    // Try multiple payload formats that Django might expect
-    const payloads = [
-      // Format 1: Standard Django User model fields
-      {
-        email: userData.email,
-        password: userData.password,
-        username: userData.email, // Django often requires username
-        first_name: userData.full_name?.split(' ')[0] || '',
-        last_name: userData.full_name?.split(' ').slice(1).join(' ') || '',
-        role: userData.role || 'client'
-      },
-      // Format 2: Custom full_name field
-      {
-        email: userData.email,
-        password: userData.password,
-        full_name: userData.full_name,
-        role: userData.role || 'client'
-      },
-      // Format 3: DRF typical format
-      {
-        email: userData.email,
-        password1: userData.password,
-        password2: userData.password,
-        username: userData.email,
-        role: userData.role || 'client'
-      }
-    ];
+    // Match the exact backend schema
+    const payload = {
+      email: userData.email,
+      password: userData.password,
+      username: userData.username,
+      first_name: userData.first_name,
+      last_name: userData.last_name,
+      phone: userData.phone || "",
+      role: userData.role || 'client'
+    };
 
-    // Try each payload format
-    for (let i = 0; i < payloads.length; i++) {
-      console.log(`📤 Trying registration format ${i + 1}:`, payloads[i]);
-      
-      const result = await this.request<User>('/auth/register/', {
-        method: 'POST',
-        body: JSON.stringify(payloads[i]),
-      });
+    console.log('📤 Registering user with payload:', payload);
+    
+    const result = await this.request<User>('/auth/register/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
 
-      if (!result.error) {
-        console.log(`✅ Registration successful with format ${i + 1}`);
-        return result;
-      } else {
-        console.log(`❌ Format ${i + 1} failed:`, result.error);
-      }
+    if (!result.error) {
+      console.log('✅ Registration successful');
+    } else {
+      console.log('❌ Registration failed:', result.error);
     }
 
-    // If all formats failed, return the last error
-    return this.request<User>('/auth/register/', {
-      method: 'POST',
-      body: JSON.stringify(payloads[0]),
-    });
+    return result;
   }
 
   async refreshToken(refreshToken: string): Promise<ApiResponse<TokenResponse>> {
@@ -209,9 +184,49 @@ class ApiClient {
     return this.request<Product>(`/products/${id}/`);
   }
 
+  async createProduct(productData: any): Promise<ApiResponse<Product>> {
+    return this.request<Product>('/products/', {
+      method: 'POST',
+      body: JSON.stringify(productData),
+    });
+  }
+
+  async updateProduct(id: string, productData: any): Promise<ApiResponse<Product>> {
+    return this.request<Product>(`/products/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(productData),
+    });
+  }
+
+  async deleteProduct(id: string): Promise<ApiResponse> {
+    return this.request(`/products/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
   // Categories
   async getCategories(): Promise<ApiResponse<any[]>> {
     return this.request<any[]>('/categories/');
+  }
+
+  async createCategory(categoryData: any): Promise<ApiResponse<any>> {
+    return this.request<any>('/categories/', {
+      method: 'POST',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async updateCategory(id: string, categoryData: any): Promise<ApiResponse<any>> {
+    return this.request<any>(`/categories/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async deleteCategory(id: string): Promise<ApiResponse> {
+    return this.request(`/categories/${id}/`, {
+      method: 'DELETE',
+    });
   }
 
   // Cart
@@ -220,23 +235,49 @@ class ApiClient {
   }
 
   async addToCart(productId: string, quantity: number = 1): Promise<ApiResponse<any>> {
-    return this.request<any>('/cart/items/', {
+    console.log('🛒 addToCart called with:', { productId, quantity });
+    
+    return this.request<any>('/cart/add/', {
       method: 'POST',
       body: JSON.stringify({ product_id: productId, quantity }),
     });
   }
 
   async updateCartItem(itemId: string, quantity: number): Promise<ApiResponse<any>> {
-    return this.request<any>(`/cart/items/${itemId}/`, {
+    console.log('🔄 updateCartItem called with:', { itemId, quantity });
+    
+    // Django endpoint: PATCH /cart/update/<uuid:item_id>/
+    return this.request<any>(`/cart/update/${itemId}/`, {
       method: 'PATCH',
       body: JSON.stringify({ quantity }),
     });
   }
 
   async removeFromCart(itemId: string): Promise<ApiResponse> {
-    return this.request(`/cart/items/${itemId}/`, {
-      method: 'DELETE',
+    console.log('🗑️ removeFromCart called with:', { itemId });
+    
+    // Try different endpoint patterns based on Django URLconf
+    // Pattern 1: POST /cart/remove/ with item_id in body
+    let result = await this.request('/cart/remove/', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: itemId }),
     });
+    
+    if (result.error?.includes('404')) {
+      console.log('⚠️ POST /cart/remove/ failed, trying DELETE /cart/remove/{id}/');
+      result = await this.request(`/cart/remove/${itemId}/`, {
+        method: 'DELETE',
+      });
+    }
+    
+    if (result.error?.includes('404')) {
+      console.log('⚠️ DELETE /cart/remove/{id}/ failed, trying POST /cart/remove/{id}/');
+      result = await this.request(`/cart/remove/${itemId}/`, {
+        method: 'POST',
+      });
+    }
+    
+    return result;
   }
 
   // Orders
@@ -245,7 +286,9 @@ class ApiClient {
   }
 
   async createOrder(orderData: any): Promise<ApiResponse<Order>> {
-    return this.request<Order>('/orders/', {
+    console.log('📦 Creating order with:', orderData);
+    
+    return this.request<Order>('/orders/create/', {
       method: 'POST',
       body: JSON.stringify(orderData),
     });
@@ -255,17 +298,78 @@ class ApiClient {
     return this.request<Order>(`/orders/${id}/`);
   }
 
+  async getSellerOrders(): Promise<ApiResponse<Order[]>> {
+    return this.request<Order[]>('/orders/seller/');
+  }
+
   // Dashboard
   async getDashboardData(): Promise<ApiResponse<any>> {
     return this.request<any>('/dashboard/');
   }
 
   // Payments
+  async initiatePayment(paymentData: {
+    order_id: string;
+    payment_method: 'lumicash' | 'ecocash';
+    phone_number: string;
+  }): Promise<ApiResponse<any>> {
+    console.log('💳 Initiating payment:', paymentData);
+    return this.request<any>('/payments/initiate/', {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
+  }
+
+  async confirmPayment(paymentId: string): Promise<ApiResponse<any>> {
+    console.log('✅ Confirming payment:', paymentId);
+    return this.request<any>('/payments/confirm/', {
+      method: 'POST',
+      body: JSON.stringify({ payment_id: paymentId }),
+    });
+  }
+
+  async getPaymentStatus(paymentId: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/payments/status/${paymentId}/`);
+  }
+
   async processPayment(paymentData: any): Promise<ApiResponse<any>> {
     return this.request<any>('/payments/', {
       method: 'POST',
       body: JSON.stringify(paymentData),
     });
+  }
+
+  // Wishlist
+  async getWishlist(): Promise<ApiResponse<any>> {
+    return this.request<any>('/wishlist/');
+  }
+
+  async addToWishlist(productId: string): Promise<ApiResponse<any>> {
+    console.log('💜 Adding to wishlist:', productId);
+    return this.request<any>('/wishlist/add/', {
+      method: 'POST',
+      body: JSON.stringify({ product_id: productId }),
+    });
+  }
+
+  async removeFromWishlist(productId: string): Promise<ApiResponse<any>> {
+    console.log('💔 Removing from wishlist:', productId);
+    return this.request<any>('/wishlist/remove/', {
+      method: 'POST',
+      body: JSON.stringify({ product_id: productId }),
+    });
+  }
+
+  async toggleWishlist(productId: string): Promise<ApiResponse<any>> {
+    console.log('💖 Toggling wishlist:', productId);
+    return this.request<any>('/wishlist/toggle/', {
+      method: 'POST',
+      body: JSON.stringify({ product_id: productId }),
+    });
+  }
+
+  async checkWishlist(productId: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/wishlist/check/?product_id=${productId}`);
   }
 }
 
