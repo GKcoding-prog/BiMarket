@@ -169,9 +169,13 @@ const Cart = () => {
 
       setShowPaymentDialog(false);
       
-      // Navigate to order confirmation or payment status page
+      // Navigate to dashboard orders tab
       setTimeout(() => {
-        navigate(`/orders/${orderData.id}`);
+        navigate('/dashboard?tab=orders');
+        toast({
+          title: "Commande créée avec succès ! 🎉",
+          description: "Consultez vos commandes dans votre tableau de bord",
+        });
       }, 2000);
 
     } catch (error: any) {

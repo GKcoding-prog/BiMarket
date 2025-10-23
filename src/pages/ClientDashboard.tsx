@@ -16,13 +16,21 @@ import {
   Star,
   Truck,
   Eye,
-  Loader2
+  Loader2,
+  X
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const ClientDashboard = () => {
   const { user } = useAuth();
@@ -38,6 +46,11 @@ const ClientDashboard = () => {
   const [wishlistItems, setWishlistItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  
+  // State for order details dialog
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [orderDetailsLoading, setOrderDetailsLoading] = useState(false);
 
   // Update active tab when URL changes
   useEffect(() => {
@@ -160,6 +173,33 @@ const ClientDashboard = () => {
     }
   };
 
+  const handleViewOrderDetails = async (order: any) => {
+    setShowOrderDialog(true);
+    setSelectedOrder(null); // Clear previous data
+    setOrderDetailsLoading(true);
+    
+    // Fetch full order details with items
+    const { data, error } = await apiClient.getOrder(order.id);
+    setOrderDetailsLoading(false);
+    
+    if (data && !error) {
+      console.log('📦 Full order details:', data);
+      console.log('📦 Order keys:', Object.keys(data));
+      const orderData = data as any;
+      console.log('📦 Order items field:', orderData.order_items || orderData.items || orderData.orderitems || orderData.orderItems);
+      setSelectedOrder(data);
+    } else {
+      console.error('❌ Failed to fetch order details:', error);
+      // Fallback to basic order data
+      setSelectedOrder(order);
+      toast({
+        title: "Attention",
+        description: "Impossible de charger tous les détails",
+        variant: "destructive",
+      });
+    }
+  };
+
   const addresses = [
     { id: 1, label: "Domicile", address: "123 Rue de la Paix", city: "Paris 75001", isDefault: true },
     { id: 2, label: "Bureau", address: "456 Avenue des Champs", city: "Lyon 69001", isDefault: false },
@@ -267,7 +307,11 @@ const ClientDashboard = () => {
                           <p className="font-bold text-lg">{formatCurrency(order.total)}</p>
                         </div>
                         <div className="flex flex-col gap-2">
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleViewOrderDetails(order)}
+                          >
                             <Eye className="h-4 w-4 mr-1" />
                             Détails
                           </Button>
@@ -450,6 +494,154 @@ const ClientDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Order Details Dialog */}
+      <Dialog open={showOrderDialog} onOpenChange={setShowOrderDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              Détails de la commande #{selectedOrder?.id?.slice(0, 8)}
+            </DialogTitle>
+            <DialogDescription>
+              Commande passée le {selectedOrder?.date}
+            </DialogDescription>
+          </DialogHeader>
+
+          {orderDetailsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : selectedOrder && (
+            <div className="space-y-6">
+              {/* Order Status */}
+              <div className="flex items-center justify-between p-4 bg-accent/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Statut de la commande</p>
+                  {getStatusBadge(selectedOrder.status)}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground mb-1">Montant total</p>
+                  <p className="text-2xl font-bold text-primary">{formatCurrency(selectedOrder.total || selectedOrder.total_amount || 0)}</p>
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              {selectedOrder.shipping_address && (
+                <div className="border border-border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    <p className="font-semibold">Adresse de livraison</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{selectedOrder.shipping_address}</p>
+                </div>
+              )}
+
+              {/* Order Items */}
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4" />
+                  Articles commandés
+                </h3>
+                <div className="space-y-3">
+                  {(() => {
+                    // Try multiple possible field names for order items
+                    const possibleItems = selectedOrder.order_items || 
+                                         selectedOrder.items || 
+                                         selectedOrder.orderitems || 
+                                         selectedOrder.orderItems ||
+                                         [];
+                    
+                    // Debug: Check what we received
+                    console.log('🔍 Selected Order Full Data:', selectedOrder);
+                    console.log('🔍 Possible Items:', possibleItems);
+                    console.log('🔍 Is Array?', Array.isArray(possibleItems));
+                    
+                    // Ensure items is an array
+                    const items = Array.isArray(possibleItems) ? possibleItems : [];
+                    
+                    if (items.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-muted-foreground border border-dashed border-border rounded-lg">
+                          <ShoppingBag className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <p>Aucun article disponible pour cette commande</p>
+                          <p className="text-xs mt-2">Debug: Vérifiez la console pour plus d'infos</p>
+                        </div>
+                      );
+                    }
+                    
+                    return items.map((item: any, index: number) => {
+                      console.log('🔍 Rendering item #', index, ':', item);
+                      
+                      // Try multiple field names for product data
+                      const productName = item.product?.name || 
+                                         item.product_name || 
+                                         item.name || 
+                                         "Produit inconnu";
+                      
+                      const productImage = item.product?.image_url || 
+                                          item.product?.image || 
+                                          item.image_url ||
+                                          item.image ||
+                                          "/placeholder.svg";
+                      
+                      const itemPrice = item.price || item.unit_price || item.product?.price || 0;
+                      const itemQuantity = item.quantity || 1;
+                      
+                      return (
+                        <div key={item.id || index} className="flex items-center gap-4 p-3 border border-border rounded-lg">
+                          <img 
+                            src={productImage} 
+                            alt={productName} 
+                            className="w-16 h-16 object-cover rounded"
+                            onError={(e) => { e.currentTarget.src = "/placeholder.svg"; }}
+                          />
+                          <div className="flex-1">
+                            <p className="font-semibold">{productName}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Quantité: {itemQuantity}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-primary">
+                              {formatCurrency(parseFloat(String(itemPrice)))}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(parseFloat(String(itemPrice)) * itemQuantity)} total
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Payment Info */}
+              {selectedOrder.payment_method && (
+                <div className="border border-border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                    <p className="font-semibold">Mode de paiement</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground capitalize">
+                    {selectedOrder.payment_method === 'lumicash' ? 'LumiCash' : 
+                     selectedOrder.payment_method === 'ecocash' ? 'EcoCash' : 
+                     selectedOrder.payment_method}
+                  </p>
+                </div>
+              )}
+
+              {/* Order Timeline */}
+              <div className="border-t border-border pt-4">
+                <p className="text-xs text-muted-foreground">
+                  Commande créée le {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('fr-FR') : selectedOrder.date}
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
