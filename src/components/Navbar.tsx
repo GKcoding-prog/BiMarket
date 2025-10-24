@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api";
+import { ModeToggle } from "@/components/mode-toggle";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -110,6 +111,9 @@ const Navbar = () => {
             <Button variant="ghost" size="icon" className="lg:hidden">
               <Search className="h-5 w-5" />
             </Button>
+
+            {/* Theme Toggle */}
+            <ModeToggle />
 
             {/* Wishlist - Only for logged in users */}
             {user && (

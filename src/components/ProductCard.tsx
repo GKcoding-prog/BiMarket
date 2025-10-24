@@ -181,9 +181,9 @@ const ProductCard = ({
   if (viewMode === "list") {
     return (
       <Card className="group overflow-hidden border-border hover:shadow-lg transition-all duration-300">
-        <div className="flex p-4">
+        <div className="flex flex-col sm:flex-row p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Image */}
-          <div className="relative w-32 h-32 flex-shrink-0 mr-4">
+          <div className="relative w-full sm:w-32 h-48 sm:h-32 flex-shrink-0">
             <img 
               src={image} 
               alt={name}
@@ -194,12 +194,12 @@ const ProductCard = ({
             {/* Badges */}
             <div className="absolute top-2 left-2 space-y-1">
               {isNew && (
-                <Badge className="bg-blue-500 text-white text-xs">
+                <Badge className="bg-blue-500 text-white text-[10px] sm:text-xs">
                   Nouveau
                 </Badge>
               )}
               {discount && (
-                <Badge className="bg-red-500 text-white text-xs">
+                <Badge className="bg-red-500 text-white text-[10px] sm:text-xs">
                   -{discount}%
                 </Badge>
               )}
@@ -207,10 +207,10 @@ const ProductCard = ({
           </div>
 
           {/* Content */}
-          <div className="flex-1 flex flex-col justify-between">
+          <div className="flex-1 flex flex-col justify-between min-w-0">
             <div>
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+              <div className="flex items-start justify-between mb-1.5 sm:mb-2 gap-2">
+                <h3 className="font-semibold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors line-clamp-2 flex-1">
                   {name}
                 </h3>
                 <Button 
@@ -218,58 +218,61 @@ const ProductCard = ({
                   size="icon"
                   onClick={handleWishlist}
                   disabled={wishlistLoading}
-                  className={`transition-colors ${
+                  className={`h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 transition-colors ${
                     isInWishlist 
                       ? 'text-red-500 hover:text-red-600' 
                       : 'text-muted-foreground hover:text-red-500'
                   }`}
                 >
-                  <Heart className={`h-4 w-4 ${isInWishlist ? 'fill-current' : ''}`} />
+                  <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isInWishlist ? 'fill-current' : ''}`} />
                 </Button>
               </div>
               
-              <Badge variant="outline" className="mb-2 text-xs">
+              <Badge variant="outline" className="mb-1.5 sm:mb-2 text-[10px] sm:text-xs">
                 {categoryName}
               </Badge>
 
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1.5 sm:space-x-2 mb-1.5 sm:mb-2">
+                <div className="flex items-center space-x-0.5 sm:space-x-1">
                   {renderStars(rating)}
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {rating} ({reviews} avis)
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  {rating} ({reviews})
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold text-primary">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <span className="text-lg sm:text-xl font-bold text-primary">
                   {formatCurrency(numPrice)}
                 </span>
                 {numOriginalPrice && (
-                  <span className="text-sm text-muted-foreground line-through">
+                  <span className="text-xs sm:text-sm text-muted-foreground line-through">
                     {formatCurrency(numOriginalPrice)}
                   </span>
                 )}
               </div>
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={handleQuickView}
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm"
                 >
-                  <Eye className="h-4 w-4 mr-1" />
-                  Voir
+                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                  <span className="hidden sm:inline">Voir</span>
+                  <span className="sm:hidden">👁️</span>
                 </Button>
                 <Button 
                   size="sm"
                   onClick={handleAddToCart}
                   disabled={isAdding}
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm"
                 >
-                  <ShoppingCart className="h-4 w-4 mr-1" />
-                  {isAdding ? "..." : "Ajouter"}
+                  <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                  {isAdding ? "..." : <><span className="hidden sm:inline">Ajouter</span><span className="sm:hidden">+</span></>}
                 </Button>
               </div>
             </div>
@@ -340,44 +343,44 @@ const ProductCard = ({
         </div>
       </div>
       
-      <CardContent className="p-4">
-        <h3 className="font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+      <CardContent className="p-3 sm:p-4">
+        <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2 line-clamp-2 group-hover:text-primary transition-colors">
           {name}
         </h3>
         
-        <div className="flex items-center space-x-1 mb-2">
+        <div className="flex items-center space-x-1 mb-1.5 sm:mb-2">
           {renderStars(rating)}
-          <span className="text-xs text-muted-foreground ml-1">
+          <span className="text-[10px] sm:text-xs text-muted-foreground ml-1">
             ({reviews})
           </span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <p className="text-xl font-bold text-primary">{formatCurrency(numPrice)}</p>
+        <div className="flex items-center justify-between flex-wrap gap-1">
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
+            <p className="text-base sm:text-xl font-bold text-primary">{formatCurrency(numPrice)}</p>
             {numOriginalPrice && (
-              <p className="text-sm text-muted-foreground line-through">
+              <p className="text-xs sm:text-sm text-muted-foreground line-through">
                 {formatCurrency(numOriginalPrice)}
               </p>
             )}
           </div>
           {discount && (
-            <Badge variant="destructive" className="text-xs">
+            <Badge variant="destructive" className="text-[10px] sm:text-xs">
               -{discount}%
             </Badge>
           )}
         </div>
       </CardContent>
       
-      <CardFooter className="p-4 pt-0">
+      <CardFooter className="p-3 sm:p-4 pt-0">
         <Button 
-          className="w-full group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" 
-          size="lg"
+          className="w-full group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-xs sm:text-sm" 
+          size="sm"
           onClick={handleAddToCart}
           disabled={isAdding}
         >
-          <ShoppingCart className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
-          {isAdding ? "Ajout..." : "Ajouter au panier"}
+          <ShoppingCart className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" />
+          {isAdding ? "Ajout..." : "Ajouter"}
         </Button>
       </CardFooter>
     </Card>

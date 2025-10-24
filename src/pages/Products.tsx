@@ -4,6 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { apiClient } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 import { 
@@ -25,6 +33,7 @@ const Products = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -141,8 +150,105 @@ const Products = () => {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar Filters */}
-          <div className="lg:w-1/4 space-y-6">
+          {/* Mobile Filter Button */}
+          <div className="lg:hidden">
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  Filtres
+                  {selectedCategory && (
+                    <Badge variant="secondary" className="ml-2">1</Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[400px]">
+                <SheetHeader>
+                  <SheetTitle>Filtres</SheetTitle>
+                  <SheetDescription>
+                    Affinez votre recherche de produits
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-6 space-y-6">
+                  {/* Search */}
+                  <div>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                      <Input
+                        type="text"
+                        placeholder="Rechercher..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Categories */}
+                  <div>
+                    <h4 className="font-medium text-foreground mb-3">Catégories</h4>
+                    <div className="space-y-2">
+                      {categoriesWithCounts.map((category) => (
+                        <button
+                          key={category.id || 'all'}
+                          onClick={() => {
+                            setSelectedCategory(category.id);
+                            setMobileFiltersOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors ${
+                            selectedCategory === category.id
+                              ? "bg-primary text-primary-foreground"
+                              : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <span>{category.name}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {category.count}
+                          </Badge>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quick Filters */}
+                  <div>
+                    <h4 className="font-medium text-foreground mb-3">Filtres rapides</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                      >
+                        Nouveautés
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                      >
+                        En promotion
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                      >
+                        Mieux notés
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Apply Button */}
+                  <Button 
+                    className="w-full" 
+                    onClick={() => setMobileFiltersOpen(false)}
+                  >
+                    Appliquer les filtres
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {/* Desktop Sidebar Filters */}
+          <div className="hidden lg:block lg:w-1/4 space-y-6">
             <Card className="p-6">
               <h3 className="font-semibold text-foreground mb-4 flex items-center">
                 <Filter className="h-5 w-5 mr-2" />
@@ -244,8 +350,8 @@ const Products = () => {
             ) : filteredProducts.length > 0 ? (
               <div className={
                 viewMode === "grid" 
-                  ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" 
-                  : "space-y-4"
+                  ? "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6" 
+                  : "space-y-3 sm:space-y-4"
               }>
                 {filteredProducts.map((product) => (
                   <ProductCard 
